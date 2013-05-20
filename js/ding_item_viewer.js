@@ -114,7 +114,7 @@
                   item.find('.reviews').hide();
                 }
 
-                item.find('.active-more-info').attr('href', 'ting/object/' + ting_object.id);
+                item.find('.active-more-info').attr('href', 'search/ting/' + ting_object.localId + '?permalink=1');
                 var reserve_link = item.find('.reserve-container a');
                 reserve_link.attr('href', 'reservation/reserve/' + ting_object.localId);
                 reserve_link.attr('id', 'reserve-' + ting_object.localId);

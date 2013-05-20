@@ -18,7 +18,7 @@ if ($item->has_rating) {
 <div class="browsebar-item active">
   <div class="active-item-title">
     <h2>
-      <a href="<?php echo url('ting/object/' . $item->id); ?>" class="active-title active-more-info"><?php echo $item->title; ?></a>
+      <a href="<?php echo url('search/ting/' . $item->localId, array('query' => array('permalink' => 1))); ?>" class="active-title active-more-info"><?php echo $item->title; ?></a>
     </h2>
   </div>
   <div class="cover-wrapper">
@@ -48,6 +48,6 @@ if ($item->has_rating) {
     <a href="#" class="reviews<?php echo $voxb_class; ?>">
       <?php print t('Reviews'); ?><span class="review-count">(<?php echo $item->comment_count; ?>)</span>
     </a>
-    <a href="<?php echo url('ting/object/' . $item->id); ?>" class="active-more-info"><?php print t('More info'); ?></a>
+    <a href="<?php echo url('search/ting/' . $item->localId, array('query' => array('permalink' => 1))); ?>" class="active-more-info"><?php print t('More info'); ?></a>
   </div>
 </div>
