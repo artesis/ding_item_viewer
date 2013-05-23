@@ -4,6 +4,12 @@
  * Main module file for item viewer.
  */
 
+// TODO Create image styles and modify these settings.
+// Style for item images.
+define('DING_ITEM_VIEWER_IMAGE_STYLE_SMALL', 'medium');
+// Style for active item.
+define('DING_ITEM_VIEWER_IMAGE_STYLE_BIG', 'large');
+
 /**
  * Implements hook_menu().
  */
@@ -185,114 +191,90 @@ function ding_item_viewer_build_data() {
  *   Number of objects to search.
  */
 function ding_item_viewer_get_objects($query = '', $count = 0, $no_cover = FALSE, $sort = '') {
+  module_load_include('pages.inc', 'ting_covers');
+
   $objects = array();
   $request = '(' . $query . ')';
   $page = 1;
 
+  $covers_service = TRUE;
+
   if (!empty($query) && !empty($count)) {
-    module_load_include('client.inc', 'ting');
-    // Search with portions of 10 items
-    while ($result = ding_item_viewer_search_ting($request, $page++, 10, $sort)) {
-      // This query is out of results OR we have needed amount of items
-      if ($result->numTotalCollections == 0 || count($objects) == $count) {
-        break;
+    // Search with portions of 10 items.
+    $result = ding_item_viewer_search_ting($request, $page++, 10, $sort);
+    while (count($result)) {
+      // Check images.
+      $images = array();
+      if (!$no_cover && $covers_service) {
+        foreach ($result as $search_item) {
+          // Build input for ting cover.
+          $images[] = $search_item->getLocalId() . ':' . DING_ITEM_VIEWER_IMAGE_STYLE_BIG;
+          $images[] = $search_item->getLocalId() . ':' . DING_ITEM_VIEWER_IMAGE_STYLE_SMALL;
+        }
+        try {
+          $images = _ting_covers_objects($images, TRUE);
+        }
+        catch (Exception $e) {
+          $covers_service = FALSE;
+        }
       }
 
-      foreach ($result->collections as $collection) {
-        // Whether we reached our item limit per query
+      // No images for current result set, so get more results.
+      if (empty($images) && $covers_service) {
+        $result = ding_item_viewer_search_ting($request, $page++, 10, $sort);
+        continue;
+      }
+
+      foreach ($result as $search_item) {
+        // Check if this item has an image and the service is available.
+        $image_index = $search_item->getLocalId() . ':' . DING_ITEM_VIEWER_IMAGE_STYLE_BIG;
+        $image_index_small = $search_item->getLocalId() . ':' . DING_ITEM_VIEWER_IMAGE_STYLE_SMALL;
+        if (empty($images[$image_index]) && $covers_service) {
+          // No image, skip to another item.
+          continue;
+        }
+        else {
+          $images[$image_index] = NULL;
+          $images[$image_index_small] = NULL;
+        }
+
+        $item = new stdClass();
+        $item->id = $search_item->getId();
+        $item->local_id = $search_item->getLocalId();
+        $item->isbn = $search_item->getIsbn();
+        $item->ac_source = $search_item->getAcSource();
+        $item->dc_source = $search_item->getSource();
+        $item->title = $search_item->getTitle();
+        $item->object = $search_item;
+        $item->creator = $search_item->getOneOf('creator', 'creator_aut', 'creator_mus');
+        $item->subject = $search_item->getOneOf('subject_dk5_text', 'subject_genre', 'subject');
+        $item->description = $search_item->getOneOf('description', 'abstract', 'haspart_track');
+        $item->year = $search_item->getDate();
+
+        // Default values.
+        $item->type = 1;
+        $item->rating = 0;
+        $item->rating_count = 0;
+        $item->comment_count = 0;
+        $item->has_rating = FALSE;
+
+        $item->image = $images[$image_index];
+        $item->image_active = $images[$image_index_small];
+
+        $objects[$search_item->getLocalId()] = $item;
+
+        // We have needed amount of items.
         if (count($objects) == $count) {
-          break;
+          break(2); // Break for & while.
         }
+      } // End for (building items).
 
-        foreach ($collection->reply->objects as $searchItem) {
-          // No cover for this item? Skip it!
-          try {
-            $cover_exists = ding_item_viewer_check_cover($searchItem->localId);
-          }
-          catch (Exception $e) {
-            break;
-          }
-
-          if (!$cover_exists && !$no_cover) {
-            break;
-          }
-
-          $item = new stdClass();
-          $item->id = $searchItem->id;
-          $item->localId = $searchItem->localId;
-          $item->isbn = isset($searchItem->record['dc:identifier']['dkdcplus:ISBN']) ?
-                        _ding_item_viewer_format_isbn($searchItem->record['dc:identifier']['dkdcplus:ISBN']) : NULL;
-          $item->ac_source = isset($searchItem->record['ac:source'][''][0]) ?
-                             $searchItem->record['ac:source'][''][0] : NULL;
-          $item->dc_source = isset($searchItem->record['dc:source'][''][0]) ?
-                             $searchItem->record['dc:source'][''][0] : NULL;
-          $item->title = $searchItem->record['dc:title'][''][0];
-
-          if (isset($searchItem->record['dc:creator'])) {
-            if (isset($searchItem->record['dc:creator']['oss:aut'][0])) {
-              $item->creator = $searchItem->record['dc:creator']['oss:aut'][0];
-            }
-            elseif (isset($searchItem->record['dc:creator']['oss:mus'][0])) {
-              $item->creator = $searchItem->record['dc:creator']['oss:mus'][0];
-            }
-            elseif (isset($searchItem->record['dc:creator']['oss:sort'][0])) {
-              $item->creator = $searchItem->record['dc:creator']['oss:sort'][0];
-            }
-            else {
-              $item->creator = NULL;
-            }
-          }
-          else {
-            $item->creator = NULL;
-          }
-
-          if (isset($searchItem->record['dc:subject']['dkdcplus:DK5-Text'][0])) {
-            $item->subject = $searchItem->record['dc:subject']['dkdcplus:DK5-Text'][0];
-          }
-          elseif (isset($searchItem->record['dc:subject']['oss:genre'][0])) {
-            $item->subject = $searchItem->record['dc:subject']['oss:genre'][0];
-          }
-          elseif (isset($searchItem->record['dc:subject'][''][0])) {
-            $item->subject = $searchItem->record['dc:subject'][''][0];
-          }
-          else {
-            $item->subject = NULL;
-          }
-
-          // Set image filepath.
-          // Image existence will be checked further.
-          $item->image_uri = ting_covers_object_path($searchItem->localId);
-          $item->image = file_create_url($item->image_uri);
-
-          if (isset($searchItem->record['dc:description'][''][0])) {
-            $item->description = $searchItem->record['dc:description'][''][0];
-          }
-          elseif (isset($searchItem->record['dcterms:abstract'][''][0])) {
-            $item->description = $searchItem->record['dcterms:abstract'][''][0];
-          }
-          elseif (isset($searchItem->record['dcterms:hasPart'])) {
-            $item->description = $searchItem->record['dcterms:hasPart']['oss:track'];
-          }
-          else {
-            $item->description = '';
-          }
-
-          $item->year = isset($searchItem->record['dc:date'][''][0]) ?
-                        $searchItem->record['dc:date'][''][0] : NULL;
-          // Default values
-          $item->type = 1;
-          $item->rating = 0;
-          $item->rating_count = 0;
-          $item->comment_count = 0;
-          $item->has_rating = FALSE;
-
-          $objects[$searchItem->localId] = $item;
-          break;
-        }
-      }
-    }
+      // Next portion of results.
+      $result = ding_item_viewer_search_ting($request, $page++, 10, $sort);
+    } // End while.
 
     // Make an array of local id's, fetchable by voxb
+    /*
     if (module_exists('ding_voxb')) {
       $local_ids = array();
       foreach ($objects as $local_id => $v) {
@@ -319,7 +301,8 @@ function ding_item_viewer_get_objects($query = '', $count = 0, $no_cover = FALSE
         }
       }
     }
-  }
+    */
+  } // End if.
 
   return $objects;
 }
@@ -341,34 +324,13 @@ function ding_item_viewer_search_ting($query = '', $page = 1, $records = 10, $so
     $query = '(' . $query . ')';
 
     $options = array(
-      'allObjects' => FALSE,
-      'enrich' => TRUE,
       'sort' => $sort,
+      'skip_relations' => TRUE,
     );
 
     $search_result = ting_do_search($query, $page, $records, $options);
 
     return $search_result;
-  }
-
-  return FALSE;
-}
-
-/**
- * Check for cover existence.
- *
- * @param $local_id
- *   Ting item local id.
- * @return
- *   TRUE if item has a cover, FALSE otherwise.
- */
-function ding_item_viewer_check_cover($local_id) {
-  $service = new AdditionalInformationService(variable_get('addi_wsdl_url'), variable_get('addi_username'), variable_get('addi_group'), variable_get('addi_password'));
-
-  $cover = $service->getByFaustNumber($local_id);
-
-  if (isset($cover[$local_id])) {
-    return TRUE;
   }
 
   return FALSE;
@@ -381,65 +343,29 @@ function ding_item_viewer_check_cover($local_id) {
  *   Set of ting objects.
  */
 function ding_item_viewer_create_missed_covers(&$items) {
-  foreach ($items as $item_id => $item) {
-    $filepath = drupal_realpath($item->image_uri);
-    if (!file_exists($filepath)) {
-      $missing_images_ids[] = $item_id;
+  module_load_include('pages.inc', 'ting_covers');
+
+  $images = array();
+  foreach ($items as $search_item) {
+    // Build input for ting cover.
+    $images[] = $search_item->local_id . ':' . DING_ITEM_VIEWER_IMAGE_STYLE_BIG;
+    $images[] = $search_item->local_id . ':' . DING_ITEM_VIEWER_IMAGE_STYLE_SMALL;
+  }
+
+  $images = _ting_covers_objects($images);
+
+  foreach ($items as $item) {
+    $index = $item->local_id . ':' . DING_ITEM_VIEWER_IMAGE_STYLE_BIG;
+    if (!empty($images[$index])) {
+      $item->image_active = $images[$index];
+    }
+    $index = $item->local_id . ':' . DING_ITEM_VIEWER_IMAGE_STYLE_SMALL;
+    if (!empty($images[$index])) {
+      $item->image = $images[$index];
     }
   }
 
-  if (!empty($missing_images_ids)) {
-    ding_item_viewer_get_images_from_addi($items, $missing_images_ids);
-  }
-}
-
-/**
- * Get images from ADDI web-service.
- *
- * @param $items
- *   Set of ting objects.
- * @param $missing_images_local_ids
- *   Array of ting items id's with missing covers.
- * @return
- *   Set of ting objects, with image path attached.
- */
-function ding_item_viewer_get_images_from_addi(&$items, $missing_images_local_ids) {
-  require_once drupal_get_path('module', 'ting_covers') . '/ting_covers.pages.inc';
-  $service = new AdditionalInformationService(variable_get('addi_wsdl_url'), variable_get('addi_username'), variable_get('addi_group'), variable_get('addi_password'));
-
-  try {
-    // Local ids = Faust numbers. Library object identifiers can be confusing...
-    $additional_informations = $service->getByFaustNumber($missing_images_local_ids);
-  }
-  catch (Exception $e) {
-    return;
-  }
-
-  foreach ($missing_images_local_ids as $local_id) {
-    // Try to extract the image url from the result
-    $source_url = FALSE;
-    if (isset($additional_informations[$local_id]) && $ai = $additional_informations[$local_id]) {
-      if ($ai->detailUrl) {
-        $source_url = $ai->detailUrl;
-      }
-      elseif ($ai->thumbnailUrl) {
-        $source_url = $ai->thumbnailUrl;
-      }
-    }
-
-    // Try to download the image locally
-    $file = _ting_covers_pages_fetch_image(ting_covers_object_path($local_id), $source_url);
-
-    if ($file) {
-      //Generate a path corresponding to the downloaded image, styled
-      $items[$local_id]->image = file_create_url($file);
-    }
-    else {
-      // @todo
-      // Some default image perhaps.
-      $items[$local_id]->image = '';
-    }
-  }
+  return $images;
 }
 
 /**
@@ -461,21 +387,4 @@ function ding_item_viewer_ding_item_cache() {
   return array(
     'ding_item_viewer' => t('Ding item viewer'),
   );
-}
-
-/**
- * Format ISBN number.
- * Remove all spaces and dashes.
- * @param string $isbn
- *   Unformated ISBN number.
- *
- * @return string
- *   Formated ISBN number.
- */
-function _ding_item_viewer_format_isbn($isbn) {
-  foreach ($isbn as $k => $number) {
-    $isbn[$k] = str_replace(array(' ', '-'), '', $number);
-  }
-  rsort($isbn);
-  return $isbn;
 }
