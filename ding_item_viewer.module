@@ -191,150 +191,42 @@ function ding_item_viewer_build_data() {
  *   Number of objects to search.
  */
 function ding_item_viewer_get_objects($query = '', $count = 0, $no_cover = FALSE, $sort = '') {
-  module_load_include('pages.inc', 'ting_covers');
+  module_load_include('with_images.inc', 'ting');
 
-  $objects = array();
-  $request = '(' . $query . ')';
-  $page = 1;
+  $results = ting_get_objects_with_images($query, $count, $sort, array(DING_ITEM_VIEWER_IMAGE_STYLE_BIG,DING_ITEM_VIEWER_IMAGE_STYLE_SMALL));
 
-  $covers_service = TRUE;
+  foreach ($results as $search_item) {
+    $item = new stdClass();
+    $item->id = $search_item->getId();
+    $item->local_id = $search_item->getLocalId();
+    $item->isbn = $search_item->getIsbn();
+    $item->ac_source = $search_item->getAcSource();
+    $item->dc_source = $search_item->getSource();
+    $item->title = $search_item->getTitle();
+    $item->object = $search_item;
+    $item->creator = $search_item->getOneOf('creator', 'creator_aut', 'creator_mus');
+    $item->subject = $search_item->getOneOf('subject_dk5_text', 'subject_genre', 'subject');
+    $item->description = $search_item->getOneOf('description', 'abstract', 'haspart_track');
+    $item->year = $search_item->getDate();
 
-  if (!empty($query) && !empty($count)) {
-    // Search with portions of 10 items.
-    $result = ding_item_viewer_search_ting($request, $page++, 10, $sort);
-    while (count($result)) {
-      // Check images.
-      $images = array();
-      if (!$no_cover && $covers_service) {
-        foreach ($result as $search_item) {
-          // Build input for ting cover.
-          $images[] = $search_item->getLocalId() . ':' . DING_ITEM_VIEWER_IMAGE_STYLE_BIG;
-          $images[] = $search_item->getLocalId() . ':' . DING_ITEM_VIEWER_IMAGE_STYLE_SMALL;
-        }
-        try {
-          $images = _ting_covers_objects($images, TRUE);
-        }
-        catch (Exception $e) {
-          $covers_service = FALSE;
-        }
-      }
+    // Default values.
+    $item->type = 1;
+    $item->rating = 0;
+    $item->rating_count = 0;
+    $item->comment_count = 0;
+    $item->has_rating = FALSE;
 
-      // No images for current result set, so get more results.
-      if (empty($images) && $covers_service) {
-        $result = ding_item_viewer_search_ting($request, $page++, 10, $sort);
-        continue;
-      }
+    $item->image = $search_item->getImage(DING_ITEM_VIEWER_IMAGE_STYLE_BIG);
+    $item->image_active = $search_item->getImage(DING_ITEM_VIEWER_IMAGE_STYLE_SMALL);
 
-      foreach ($result as $search_item) {
-        // Check if this item has an image and the service is available.
-        $image_index = $search_item->getLocalId() . ':' . DING_ITEM_VIEWER_IMAGE_STYLE_BIG;
-        $image_index_small = $search_item->getLocalId() . ':' . DING_ITEM_VIEWER_IMAGE_STYLE_SMALL;
-        if (empty($images[$image_index]) && $covers_service) {
-          // No image, skip to another item.
-          continue;
-        }
-        else {
-          $images[$image_index] = NULL;
-          $images[$image_index_small] = NULL;
-        }
+    $objects[$search_item->getLocalId()] = $item;
+  }
 
-        $item = new stdClass();
-        $item->id = $search_item->getId();
-        $item->local_id = $search_item->getLocalId();
-        $item->isbn = $search_item->getIsbn();
-        $item->ac_source = $search_item->getAcSource();
-        $item->dc_source = $search_item->getSource();
-        $item->title = $search_item->getTitle();
-        $item->object = $search_item;
-        $item->creator = $search_item->getOneOf('creator', 'creator_aut', 'creator_mus');
-        $item->subject = $search_item->getOneOf('subject_dk5_text', 'subject_genre', 'subject');
-        $item->description = $search_item->getOneOf('description', 'abstract', 'haspart_track');
-        $item->year = $search_item->getDate();
-
-        // Default values.
-        $item->type = 1;
-        $item->rating = 0;
-        $item->rating_count = 0;
-        $item->comment_count = 0;
-        $item->has_rating = FALSE;
-
-        $item->image = $images[$image_index];
-        $item->image_active = $images[$image_index_small];
-
-        $objects[$search_item->getLocalId()] = $item;
-
-        // We have needed amount of items.
-        if (count($objects) == $count) {
-          break(2); // Break for & while.
-        }
-      } // End for (building items).
-
-      // Next portion of results.
-      $result = ding_item_viewer_search_ting($request, $page++, 10, $sort);
-    } // End while.
-
-    // Make an array of local id's, fetchable by voxb
-    /*
-    if (module_exists('ding_voxb')) {
-      $local_ids = array();
-      foreach ($objects as $local_id => $v) {
-        if (!empty($v->isbn)) {
-          $local_ids[$local_id] = $v->isbn[0];
-        }
-      }
-
-      // Fetch details from voxb
-      $voxb_details = new VoxbItems();
-      $voxb_details->addReviewHandler('review', new VoxbReviews());
-      $response = $voxb_details->fetchByISBN($local_ids);
-
-      // Assign voxb details to items
-      if ($response && $voxb_details->getCount() > 0) {
-        foreach ($local_ids as $local_id => $isbn) {
-          $detail = $voxb_details->getItem($isbn);
-          if ($detail) {
-            $objects[$local_id]->rating = (int) round($detail->getRating() / 20);
-            $objects[$local_id]->rating_count = $detail->getRatingCount();
-            $objects[$local_id]->comment_count = $detail->getReviews('review')->getCount();
-            $objects[$local_id]->has_rating = TRUE;
-          }
-        }
-      }
-    }
-    */
-  } // End if.
+  // TODO: Get VoxB info.
 
   return $objects;
 }
 
-/**
- * Perform ting search.
- *
- * @param $query
- *   Searched query string.
- * @param $page
- *   Requested results page.
- * @param $records
- *   Number of records to fetch.
- * @return
- *   Ting search result object.
- */
-function ding_item_viewer_search_ting($query = '', $page = 1, $records = 10, $sort = '') {
-  if (!empty($query)) {
-    $query = '(' . $query . ')';
-
-    $options = array(
-      'sort' => $sort,
-      'skip_relations' => TRUE,
-    );
-
-    $search_result = ting_do_search($query, $page, $records, $options);
-
-    return $search_result;
-  }
-
-  return FALSE;
-}
 
 /**
  * Create missed covers.
