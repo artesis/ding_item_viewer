@@ -114,10 +114,10 @@
                   item.find('.reviews').hide();
                 }
 
-                item.find('.active-more-info').attr('href', 'search/ting/' + ting_object.localId + '?permalink=1');
+                item.find('.active-more-info').attr('href', 'search/ting/' + ting_object.local_id);
                 var reserve_link = item.find('.reserve-container a');
-                reserve_link.attr('href', 'reservation/reserve/' + ting_object.localId);
-                reserve_link.attr('id', 'reserve-' + ting_object.localId);
+                reserve_link.attr('href', 'reservation/reserve/' + ting_object.local_id);
+                reserve_link.attr('id', 'reserve-' + ting_object.local_id);
                 attach_ajax(reserve_link);
               }
 
