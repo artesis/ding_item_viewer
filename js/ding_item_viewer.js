@@ -91,7 +91,7 @@
               var ting_object = ting_objects[current_tab][ting_indexes[object_offset]];
               if (i != 3) {
                 item.find('.title').html(ting_object.title);
-                item.find('img.image').attr('src', ting_object.image);
+                item.find('img.image').attr('src', ting_object.image_active);
                 item.find('.author').html(ting_object.creator);
               }
               else {
