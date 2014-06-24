@@ -91,7 +91,7 @@
               var ting_object = ting_objects[current_tab][ting_indexes[object_offset]];
               if (i != 3) {
                 item.find('.title').html(ting_object.title);
-                item.find('img.image').attr('src', ting_object.image);
+                item.find('img.image').attr('src', ting_object.image_active);
                 item.find('.author').html(ting_object.creator);
               }
               else {
@@ -114,10 +114,10 @@
                   item.find('.reviews').hide();
                 }
 
-                item.find('.active-more-info').attr('href', 'ting/object/' + ting_object.id);
+                item.find('.active-more-info').attr('href', 'search/ting/' + ting_object.local_id);
                 var reserve_link = item.find('.reserve-container a');
-                reserve_link.attr('href', 'reservation/reserve/' + ting_object.localId);
-                reserve_link.attr('id', 'reserve-' + ting_object.localId);
+                reserve_link.attr('href', 'reservation/reserve/' + ting_object.local_id);
+                reserve_link.attr('id', 'reserve-' + ting_object.local_id);
                 attach_ajax(reserve_link);
               }
 
