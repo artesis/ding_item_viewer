@@ -18,20 +18,20 @@ if ($item->has_rating) {
 <div class="browsebar-item active">
   <div class="active-item-title">
     <h2>
-      <a href="<?php echo url('ting/object/' . $item->id); ?>" class="active-title active-more-info"><?php echo $item->title; ?></a>
+      <a href="<?php echo url('search/ting/' . $item->local_id); ?>" class="active-title active-more-info"><?php echo $item->title; ?></a>
     </h2>
   </div>
   <div class="cover-wrapper">
     <div class="cover-wrapper-inner">
-      <img src="<?php echo $item->image; ?>" class="image"
+      <img src="<?php echo $item->image_active; ?>" class="image"
         alt="<?php echo $item->title . ' ' . $item->year; ?>" />
     </div>
     <div class="reserve-container">
       <div class="item-loan">
         <?php print l(
           t('Reserve'),
-          'reservation/reserve/' . $item->localId,
-          array('attributes' => array('id' => 'reserve-' . $item->localId))
+          'reservation/reserve/' . $item->local_id,
+          array('attributes' => array('id' => 'reserve-' . $item->local_id))
           );
         ?>
       </div>
@@ -48,6 +48,6 @@ if ($item->has_rating) {
     <a href="#" class="reviews<?php echo $voxb_class; ?>">
       <?php print t('Reviews'); ?><span class="review-count">(<?php echo $item->comment_count; ?>)</span>
     </a>
-    <a href="<?php echo url('ting/object/' . $item->id); ?>" class="active-more-info"><?php print t('More info'); ?></a>
+    <a href="<?php echo url('search/ting/' . $item->local_id); ?>" class="active-more-info"><?php print t('More info'); ?></a>
   </div>
 </div>
