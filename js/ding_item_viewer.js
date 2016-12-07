@@ -98,8 +98,12 @@
                 item.find('img.image').attr('src', ting_object.image);
                 item.find('.active-title').html(ting_object.title);
                 item.find('.active-author').html(ting_object.creator);
-                item.find('.active-description').html(ting_object.description);
-                item.find('.genre a').html(ting_object.subject).attr('href', 'search/ting/' + ting_object.subject);
+                var active_description = document.createElement('span');
+                active_description.innerHTML = ting_object.description;
+                item.find('.active-description').html(active_description);
+                var genre = document.createElement('span');
+                genre.innerHTML = ting_object.subject;
+                item.find('.genre a').html(genre).attr('href', 'search/ting/' + ting_object.subject);
 
                 // Show ratings/reviews for items with ISBN.
                 if (ting_object.has_rating) {
